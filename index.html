@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#022c22">
+  <title>🎁 Amigo Secreto de la Familia</title>
+  <meta name="description" content="El sorteo de amigo secreto de la familia, con sobre mágico y todo un secreto.">
+
+  <!-- Icono (regalo) -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎁</text></svg>">
+
+  <!-- Tipografías: Fraunces (títulos elegantes) + Nunito (texto amable) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    /* Configuración de Tailwind: paleta festiva, fuentes y animaciones */
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Fraunces', 'Georgia', 'serif'],
+            cuerpo: ['Nunito', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+          keyframes: {
+            flotar:   { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-12px)' } },
+            aparecer: { from: { opacity: 0, transform: 'translateY(26px) scale(.97)' }, to: { opacity: 1, transform: 'translateY(0) scale(1)' } },
+            sacudir:  { '10%,90%': { transform: 'translateX(-2px)' }, '20%,80%': { transform: 'translateX(4px)' }, '30%,50%,70%': { transform: 'translateX(-7px)' }, '40%,60%': { transform: 'translateX(7px)' } },
+            girar:    { to: { transform: 'rotate(360deg)' } },
+            brillo:   { from: { transform: 'translateX(-160%) skewX(-15deg)' }, to: { transform: 'translateX(420%) skewX(-15deg)' } },
+          },
+          animation: {
+            flotar: 'flotar 5s ease-in-out infinite',
+            aparecer: 'aparecer .7s cubic-bezier(.22,1,.36,1) both',
+            sacudir: 'sacudir .55s ease both',
+            girar: 'girar 1s linear infinite',
+            brillo: 'brillo 2.8s ease-in-out infinite',
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- CryptoJS (hash del PIN + cifrado AES del resultado) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+
+  <!-- Supabase (base de datos en la nube, cliente anónimo) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Componentes reutilizables con clases Tailwind -->
+  <style type="text/tailwindcss">
+    .tarjeta-vidrio  { @apply rounded-[2rem] border border-white/15 bg-white/[0.07] shadow-2xl shadow-black/40 backdrop-blur-2xl; }
+    .etiqueta        { @apply mb-2 block text-[11px] font-extrabold uppercase tracking-[0.22em] text-amber-200/80; }
+    .selector-nombre { @apply w-full appearance-none rounded-2xl border border-white/25 bg-emerald-950/70 px-4 py-4 pr-11 font-cuerpo text-lg font-bold text-amber-50 outline-none transition focus:border-amber-300/80 focus:ring-4 focus:ring-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50; }
+    .selector-nombre option { @apply bg-emerald-950 font-semibold; }
+    .caja-pin        { @apply h-14 w-12 rounded-2xl border border-white/25 bg-white/10 text-center font-cuerpo text-2xl font-extrabold text-amber-50 caret-amber-300 outline-none transition focus:border-amber-300/80 focus:bg-white/20 focus:ring-4 focus:ring-amber-300/20; }
+    .boton-dorado    { @apply inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500 px-6 py-4 font-cuerpo text-lg font-extrabold text-emerald-950 shadow-lg shadow-amber-500/30 transition hover:brightness-110 active:scale-[.97] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100; }
+    .boton-fantasma  { @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-white/25 bg-white/5 px-5 py-3 font-cuerpo font-bold text-amber-50/90 backdrop-blur transition hover:bg-white/15 hover:text-amber-50 active:scale-95; }
+    .circulo-avatar  { @apply flex shrink-0 items-center justify-center rounded-full font-display font-bold text-white shadow-lg ring-2 ring-white/30; }
+  </style>
+
+  <!-- CSS propio: la magia de la tarjeta 3D y detalles -->
+  <style>
+    body { -webkit-font-smoothing: antialiased; }
+    /* Voltear la tarjeta del sobre */
+    .tarjeta-3d { perspective: 1400px; }
+    .tarjeta-interior { transform-style: preserve-3d; transition: transform .9s cubic-bezier(.2,.85,.3,1.08); will-change: transform; }
+    .tarjeta-interior.volteada { transform: rotateY(180deg); }
+    .cara { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .cara-trasera { transform: rotateY(180deg); }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-emerald-950 via-[#07281d] to-emerald-950 font-cuerpo text-amber-50 selection:bg-amber-300 selection:text-emerald-950">
+<noscript>
+  <p style="padding:2rem;text-align:center;">Esta aplicación necesita JavaScript para funcionar 🙏</p>
+</noscript>
+
+<!-- ════════════════ FONDO DECORATIVO (luces festivas) ════════════════ -->
+<div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+  <div class="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-emerald-500/20 blur-3xl"></div>
+  <div class="absolute -right-40 top-1/3 h-[28rem] w-[28rem] rounded-full bg-rose-800/25 blur-3xl"></div>
+  <div class="absolute -bottom-48 left-1/4 h-[26rem] w-[26rem] rounded-full bg-rose-600/15 blur-3xl"></div>
+  <span class="absolute left-[12%] top-[18%] text-xl text-amber-200/30 animate-flotar">✦</span>
+  <span class="absolute right-[16%] top-[30%] text-sm text-amber-200/20 animate-flotar" style="animation-delay:1.2s">✦</span>
+  <span class="absolute bottom-[22%] left-[20%] text-base text-amber-200/20 animate-flotar" style="animation-delay:2s">✦</span>
+  <span class="absolute bottom-[14%] right-[24%] text-xl text-amber-200/25 animate-flotar" style="animation-delay:.6s">✦</span>
+  <span class="absolute left-[45%] top-[8%] text-sm text-amber-200/20 animate-flotar" style="animation-delay:2.6s">✦</span>
+</div>
+
+<!-- Lienzo del confeti (encima de todo, pero no intercepta clics) -->
+<canvas id="lienzo-confetti" class="pointer-events-none fixed inset-0 z-[60]"></canvas>
+
+<!-- Avisos flotantes (toasts) -->
+<div id="toasts" class="pointer-events-none fixed inset-x-0 top-4 z-[70] flex flex-col items-center gap-2 px-4"></div>
+
+<main class="relative z-10 mx-auto flex min-h-screen w-full max-w-xl flex-col items-center justify-center px-4 py-10">
+
+  <!-- ════════════════ PANTALLA 1 · BIENVENIDA / LOGIN ════════════════ -->
+  <section id="pantalla-bienvenida" class="flex w-full animate-aparecer flex-col items-center">
+
+    <div class="mb-8 text-center">
+      <div class="mx-auto mb-5 flex h-20 w-20 animate-flotar items-center justify-center rounded-3xl border border-amber-300/40 bg-gradient-to-br from-emerald-800/80 to-emerald-950/80 text-5xl shadow-2xl shadow-black/40 backdrop-blur">🎁</div>
+      <h1 class="font-display text-4xl font-bold italic tracking-tight text-amber-50 sm:text-5xl">Amigo Secreto</h1>
+      <p class="mt-3 text-xs font-extrabold uppercase tracking-[0.35em] text-amber-200/70">de la familia · un secreto entre nosotros</p>
+    </div>
+
+    <div class="tarjeta-vidrio w-full p-6 sm:p-8">
+
+      <!-- Aviso: credenciales de Supabase sin configurar -->
+      <div id="alerta-config" class="mb-6 hidden rounded-2xl border border-amber-300/40 bg-amber-300/10 p-4 text-sm leading-relaxed text-amber-100">
+        🛠️ <strong>Falta configurar la base de datos.</strong>
+        <p id="alerta-config-texto" class="mt-1">Abre este archivo <code>index.html</code> y, en la sección <strong>① CREDENCIALES</strong> del código (al final del archivo), reemplaza <code>SUPABASE_URL</code> y <code>SUPABASE_ANON_KEY</code> por los de tu proyecto de Supabase. Ahí mismo encontrarás el SQL para crear las tablas.</p>
+      </div>
+
+      <!-- Paso 1: elegir nombre -->
+      <label class="etiqueta" for="selector-nombre">Paso 1 · ¿Quién eres?</label>
+      <div class="flex items-center gap-3">
+        <div id="avatar-seleccionado" class="circulo-avatar h-14 w-14 text-xl" style="background-image:linear-gradient(135deg,#34d399,#0f766e)">?</div>
+        <div class="relative flex-1">
+          <select id="selector-nombre" class="selector-nombre">
+            <option value="" selected>— Elige tu nombre —</option>
+          </select>
+          <svg class="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-amber-200/70" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"/></svg>
+        </div>
+      </div>
+      <p id="estado-nombre" class="mt-3 min-h-[1.5rem] text-center text-sm font-bold text-amber-100/80" aria-live="polite"></p>
+
+      <div class="my-5 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+
+      <!-- Paso 2A: ya tenía PIN (iniciar sesión) -->
+      <div id="zona-pin-login" class="hidden">
+        <span class="etiqueta text-center after:content-['']">Paso 2 · Tu PIN secreto</span>
+        <div id="cajas-pin-login" class="mb-6 flex justify-center gap-2 sm:gap-3">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" class="caja-pin" aria-label="Dígito 1 del PIN">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 2 del PIN">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 3 del PIN">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 4 del PIN">
+        </div>
+        <button id="btn-entrar" class="boton-dorado" disabled>Entrar 💌</button>
+      </div>
+
+      <!-- Paso 2B: primera vez (crear PIN) -->
+      <div id="zona-pin-nuevo" class="hidden">
+        <span class="etiqueta text-center">Paso 2 · Invente tu PIN (4 dígitos)</span>
+        <div id="cajas-pin-nueva" class="mb-5 flex justify-center gap-2 sm:gap-3">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" class="caja-pin" aria-label="Dígito 1 del PIN nuevo">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 2 del PIN nuevo">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 3 del PIN nuevo">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 4 del PIN nuevo">
+        </div>
+        <span class="etiqueta text-center">Confírmalo</span>
+        <div id="cajas-pin-confirmar" class="mb-2 flex justify-center gap-2 sm:gap-3">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 1 de la confirmación">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 2 de la confirmación">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 3 de la confirmación">
+          <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="caja-pin" aria-label="Dígito 4 de la confirmación">
+        </div>
+        <p class="mb-6 text-center text-xs text-emerald-100/70">Sólo tú lo conoces — no lo olvides, lo necesitarás siempre 💛</p>
+        <button id="btn-crear" class="boton-dorado" disabled>Crear mi llave secreta ✨</button>
+      </div>
+
+      <!-- Aún sin nombre elegido -->
+      <p id="zona-elegir" class="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-4 py-6 text-center text-sm font-semibold text-emerald-100/70">👇 Elige tu nombre en la lista para continuar</p>
+    </div>
+
+    <p class="mt-6 text-center text-xs text-emerald-100/60">🔒 Tu PIN protege tu sobre: nadie más puede abrirlo · Hecho con ❤️ para la familia</p>
+  </section>
+
+  <!-- ════════════════ PANTALLA 2 · REVELACIÓN ════════════════ -->
+  <section id="pantalla-revelacion" class="hidden w-full animate-aparecer flex-col items-center">
+
+    <!-- Encabezado: quién está conectado + acciones -->
+    <div class="mb-10 flex w-full max-w-md items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div id="avatar-usuario" class="circulo-avatar h-14 w-14 text-xl" style="background-image:linear-gradient(135deg,#34d399,#0f766e)"></div>
+        <div>
+          <p class="text-[10px] font-extrabold uppercase tracking-[0.25em] text-amber-200/60">Hola, soy</p>
+          <p id="saludo-nombre" class="font-display text-2xl font-bold leading-tight"></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Botón "secreto" del organizador: sólo lo ve el administrador -->
+        <button id="btn-admin" class="hidden h-11 w-11 rounded-full border border-white/15 bg-white/5 text-xl opacity-60 backdrop-blur transition hover:scale-110 hover:opacity-100 active:scale-95" title="Panel del organizador" aria-label="Panel del organizador">🎁</button>
+        <button id="btn-salir" class="boton-fantasma !px-4 !py-2 text-sm">Salir</button>
+      </div>
+    </div>
+
+    <!-- Estado: buscando el sobre -->
+    <div id="estado-cargando" class="hidden flex-col items-center gap-5 py-16">
+      <div class="h-12 w-12 animate-girar rounded-full border-4 border-white/15 border-t-amber-300"></div>
+      <p class="text-sm font-bold text-emerald-100/60">Buscando tu sobre…</p>
+    </div>
+
+    <!-- Estado: el sorteo aún no existe -->
+    <div id="estado-espera" class="hidden w-full max-w-md">
+      <div class="tarjeta-vidrio p-10 text-center">
+        <div class="mb-6 animate-flotar text-6xl">⏳</div>
+        <h2 class="font-display text-2xl font-bold text-amber-50">Todavía no hay sorteo</h2>
+        <p id="texto-espera" class="mt-3 leading-relaxed text-emerald-100/70"></p>
+        <button id="btn-reintentar" class="boton-fantasma mt-7">🔄 Revisar de nuevo</button>
+      </div>
+    </div>
+
+    <!-- Estado: ¡sobre listo! Tarjeta que se voltea -->
+    <div id="estado-listo" class="hidden w-full max-w-md text-center">
+      <p class="mb-7 font-display text-xl italic text-amber-100/90">¿Preparado para el gran momento?</p>
+
+      <div id="tarjeta-sorteo" class="tarjeta-3d mx-auto w-full max-w-sm cursor-pointer select-none transition-transform duration-300 hover:-translate-y-1" role="button" tabindex="0" aria-label="Toca para descubrir tu amigo secreto">
+        <div id="tarjeta-interior" class="tarjeta-interior relative h-[21rem] w-full">
+          <!-- Cara frontal: el regalo cerrado -->
+          <div class="cara cara-frontal absolute inset-0 flex flex-col items-center justify-center gap-4 overflow-hidden rounded-[2rem] border-2 border-amber-300/60 bg-gradient-to-br from-emerald-800 via-emerald-900 to-emerald-950 shadow-2xl shadow-emerald-950/60">
+            <div class="pointer-events-none absolute inset-0 rounded-[2rem]" style="background-image:radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px); background-size:22px 22px;"></div>
+            <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-[2rem]"><div class="absolute inset-y-0 w-1/3 animate-brillo bg-gradient-to-r from-transparent via-white/25 to-transparent"></div></div>
+            <span class="animate-flotar text-7xl drop-shadow-[0_10px_25px_rgba(0,0,0,.45)]">🎁</span>
+            <p class="font-display text-2xl font-semibold italic text-amber-100">Toca para abrir tu regalo</p>
+            <p class="px-6 text-sm text-emerald-200/70">Tu amigo secreto te está esperando…</p>
+          </div>
+          <!-- Cara trasera: la revelación -->
+          <div class="cara cara-trasera absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[2rem] border-2 border-amber-400/80 bg-gradient-to-b from-amber-50 to-orange-50 px-6 shadow-2xl">
+            <p class="text-[11px] font-extrabold uppercase tracking-[0.35em] text-emerald-700/70">Tu amigo secreto es</p>
+            <div id="avatar-amigo" class="circulo-avatar h-20 w-20 text-3xl !ring-amber-400/60" style="background-image:linear-gradient(135deg,#34d399,#0f766e)"></div>
+            <p id="nombre-amigo" class="font-display text-4xl font-bold text-emerald-900"></p>
+            <p class="text-sm font-semibold text-emerald-800/70">¡Cuídalo mucho y que no se te escape! 🤍</p>
+          </div>
+        </div>
+      </div>
+
+      <p id="pista-secreto" class="mt-7 text-sm font-bold text-rose-200/80 opacity-0 transition-opacity duration-700">🤫 Psst… es un secreto entre nosotros</p>
+    </div>
+  </section>
+</main>
+
+<!-- ════════════════ MODAL · PANEL DEL ORGANIZADOR ════════════════ -->
+<div id="modal-admin" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Panel del organizador">
+  <div class="tarjeta-vidrio max-h-[90vh] w-full max-w-lg animate-aparecer overflow-y-auto p-6 sm:p-8">
+    <div class="mb-6 flex items-start justify-between gap-4">
+      <div>
+        <h2 class="font-display text-2xl font-bold">Panel del organizador 🎩</h2>
+        <p class="mt-1 text-sm text-emerald-100/60">Sólo tú puedes ver este panel</p>
+      </div>
+      <button id="btn-cerrar-admin" class="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg transition hover:bg-white/15" aria-label="Cerrar">✕</button>
+    </div>
+
+    <div class="mb-6 grid grid-cols-2 gap-3">
+      <div class="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
+        <p id="stat-registrados" class="font-display text-3xl font-bold text-amber-300">…</p>
+        <p class="mt-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-100/60">Con PIN creado</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
+        <p id="stat-sorteo" class="font-display text-2xl font-bold leading-[2.4rem] text-amber-300">…</p>
+        <p class="mt-1 text-[10px] font-extrabold uppercase tracking-widest text-emerald-100/60">Estado del sorteo</p>
+      </div>
+    </div>
+
+    <p class="etiqueta">Participantes de la familia</p>
+    <div id="chips-participantes" class="mb-6 flex flex-wrap gap-2"></div>
+
+    <button id="btn-generar-sorteo" class="boton-dorado">🎲 Generar el sorteo</button>
+    <p id="nota-sorteo" class="mt-4 hidden text-center text-xs leading-relaxed text-emerald-100/60">✅ El sorteo ya fue realizado: los resultados quedaron guardados y cifrados. No se puede repetir ni cambiar (así nadie hace trampa 😉).</p>
+  </div>
+</div>
+
+<!-- ════════════════ MODAL · CONFIRMAR SORTEO ════════════════ -->
+<div id="modal-confirmar" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Confirmar sorteo">
+  <div class="tarjeta-vidrio w-full max-w-md animate-aparecer p-6 text-center sm:p-8">
+    <div class="mb-4 text-5xl">⚠️</div>
+    <h2 class="font-display text-2xl font-bold">¿Generar el sorteo ahora?</h2>
+    <p class="mt-3 text-sm leading-relaxed text-emerald-100/70">Se asignará un amigo secreto a <strong>toda la familia</strong> respetando los grupos (nadie sacará a alguien de su propia casa 🏠).</p>
+    <p class="mt-3 text-sm font-bold text-rose-300">Esta acción es irreversible: no se puede repetir ni cambiar.</p>
+    <div class="mt-7 flex flex-col gap-3">
+      <button id="btn-confirmar-sorteo" class="boton-dorado">¡Sí, generar el sorteo! 🎉</button>
+      <button id="btn-cancelar-sorteo" class="boton-fantasma w-full">Mejor espero un poco</button>
+    </div>
+  </div>
+</div>
+
+<script id="codigo-app">
+/* ═══════════════════════════════════════════════════════════════════
+   🎁 AMIGO SECRETO DE LA FAMILIA — aplicación de un solo archivo
+   ═══════════════════════════════════════════════════════════════════
+
+   ┌──────────────────────────────────────────────────────────────┐
+   │  ① CREDENCIALES — ¡EDITA SOLO ESTA SECCIÓN!                  │
+   └──────────────────────────────────────────────────────────────┘
+   1. Crea un proyecto gratis en https://supabase.com
+   2. En "SQL Editor" pega y ejecuta el SQL de más abajo (sección ⓿).
+   3. En "Project Settings → API" copia:
+        - "Project URL"                    → pégala en SUPABASE_URL
+        - "anon public" (clave pública)    → pégala en SUPABASE_ANON_KEY
+   4. Cambia CLAVE_CIFRADO por cualquier frase larga y rara SOLO UNA VEZ,
+      ANTES de generar el sorteo (con ella se cifran los resultados;
+      si la cambias después, los sobres existentes no se podrán abrir).
+   5. (Opcional) En NOMBRE_ADMIN escribe quién será el organizador,
+      por ejemplo 'Jhon'. Si lo dejas en null, el organizador será
+      la PRIMERA persona que cree su PIN.
+*/
+const SUPABASE_URL      = 'https://rshubvczkdtjmhnmijcb.supabase.co';        // ej: 'https://xxxx.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzaHVidmN6a2R0am1obm1pamNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzMjU2NjUsImV4cCI6MjEwNDkwMTY2NX0.MOnehlgVMByZZG2IpuR849oM6ZNTDcrKh0WcnKGqoJA';     // ej: 'eyJhbGciOi...'
+const CLAVE_CIFRADO     = 'nochebuena-7e959422b0-275efacfc3-2026';
+const NOMBRE_ADMIN      = null;                                  // ej: 'Jhon'  o  null
+
+/* ─────────────────────────────────────────────────────────────────
+   ⓿ ESTRUCTURA DE LA BASE DE DATOS (cópiala en Supabase → SQL Editor)
+   ─────────────────────────────────────────────────────────────────
+
+   -- Participantes: nombre + PIN (guardado como hash, nunca en texto plano)
+   create table if not exists public.participantes (
+     id         uuid primary key default gen_random_uuid(),
+     nombre     text not null unique,
+     pin_hash   text not null,              -- formato: sal$iteraciones$hash
+     es_admin   boolean not null default false,
+     creado_en  timestamptz not null default now()
+   );
+
+   -- Sorteo: quién regala a quién. El destinatario va CIFRADO (AES).
+   create table if not exists public.sorteo (
+     id                  uuid primary key default gen_random_uuid(),
+     da_nombre           text not null unique,   -- quien regala
+     recibe_nombre_cifrado text not null,        -- a quién le regala (cifrado)
+     creado_en           timestamptz not null default now()
+   );
+
+   -- Seguridad: activar RLS y permitir SOLO leer e insertar.
+   -- Sin políticas de UPDATE ni DELETE: desde la web nadie puede cambiar
+   -- un PIN ya creado ni alterar/repetir el sorteo. Para reiniciar algo,
+   -- hazlo desde el panel de Supabase directamente.
+   alter table public.participantes enable row level security;
+   alter table public.sorteo        enable row level security;
+
+   create policy "leer_participantes"    on public.participantes for select to anon using (true);
+   create policy "insertar_participantes" on public.participantes for insert to anon with check (true);
+   create policy "leer_sorteo"           on public.sorteo        for select to anon using (true);
+   create policy "insertar_sorteo"       on public.sorteo        for insert to anon with check (true);
+   ───────────────────────────────────────────────────────────────── */
+
+/* ═══════════════════════════════════════════════════════════════
+   ② LA FAMILIA Y SUS GRUPOS (nadie puede sacar a alguien de su grupo)
+   ═══════════════════════════════════════════════════════════════ */
+const GRUPOS = [
+  ['Jhon', 'Paops'],                                      // Grupo 1
+  ['Laurita', 'Juanito', 'Alma'],                          // Grupo 2
+  ['Samuelito', 'Sofi', 'Juanes', 'Angela', 'David'],      // Grupo 3
+  ['Nata', 'Yeyito', 'Clarita', 'Kelly'],                  // Grupo 4
+  ['Maruchita'],                                           // Grupo 5
+];
+const FAMILIA  = GRUPOS.flat();
+const GRUPO_DE = {};
+GRUPOS.forEach((integrantes, i) => integrantes.forEach(nombre => GRUPO_DE[nombre] = i));
+
+/* ③ AJUSTES */
+const ITERACIONES_PIN = 15000; // vueltas del hash: más vueltas = más lento romper el PIN
+
+/* ═════════════════ Utilidades básicas ═════════════════ */
+const $ = id => document.getElementById(id);
+const esperar = ms => new Promise(res => setTimeout(res, ms));
+let bd = null;               // cliente de Supabase
+let usuarioActual = null;    // fila del participante conectado
+let participanteEnVista = null; // fila del nombre elegido en el login
+let modoActual = null;       // 'ingresar' | 'crear' | null
+let ocupado = false;         // true mientras hay una petición en curso
+
+const credencialesListas = () => /^https?:\/\//.test(SUPABASE_URL) && !/PEGA/i.test(SUPABASE_ANON_KEY);
+
+/* ═════════════════ Seguridad: hash del PIN y cifrado del resultado ═════════════════ */
+function hashearPin(pin, sal, iteraciones = ITERACIONES_PIN) {
+  // SHA-256 con "sal" aleatoria + miles de vueltas: nunca se guarda el PIN real.
+  let hash = CryptoJS.SHA256(sal + pin);
+  for (let i = 1; i < iteraciones; i++) hash = CryptoJS.SHA256(hash.toString(CryptoJS.enc.Hex));
+  return hash.toString(CryptoJS.enc.Hex);
+}
+const cifrar   = texto => CryptoJS.AES.encrypt(texto, CLAVE_CIFRADO).toString();
+const descifrar = dato => {
+  try { return CryptoJS.AES.decrypt(dato, CLAVE_CIFRADO).toString(CryptoJS.enc.Utf8); }
+  catch { return ''; }
+};
+
+/* ═════════════════ Avilitos de colores (iniciales) ═════════════════ */
+const PALETA_AVATAR = [
+  ['#34d399', '#0f766e'], ['#fbbf24', '#d97706'], ['#fb7185', '#be123c'],
+  ['#2dd4bf', '#0d9488'], ['#f97316', '#e11d48'], ['#a3e635', '#059669'], ['#f43f5e', '#9f1239'],
+];
+function pintarAvatar(el, nombre) {
+  const limpio = nombre || '?';
+  el.textContent = limpio[0].toUpperCase();
+  const par = PALETA_AVATAR[[...limpio].reduce((s, c) => s + c.charCodeAt(0), 0) % PALETA_AVATAR.length];
+  el.style.backgroundImage = `linear-gradient(135deg, ${par[0]}, ${par[1]})`;
+}
+
+/* ═════════════════ Avisos flotantes (toasts) ═════════════════ */
+function toast(mensaje, tipo = 'info') {
+  const estilos = {
+    info:  'border-white/20 bg-emerald-900/90 text-amber-50',
+    error: 'border-rose-400/40 bg-rose-950/90 text-rose-100',
+    exito: 'border-amber-300/50 bg-emerald-900/90 text-amber-100',
+  };
+  const el = document.createElement('div');
+  el.className = `pointer-events-auto max-w-sm rounded-2xl border px-5 py-3 text-center text-sm font-bold shadow-2xl backdrop-blur-xl ${estilos[tipo]}`;
+  el.style.cssText = 'opacity:0;transform:translateY(-14px);transition:opacity .35s,transform .35s;';
+  el.textContent = mensaje;
+  $('toasts').appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(-10px)'; }, 3400);
+  setTimeout(() => el.remove(), 3900);
+}
+
+/* ═════════════════ Confeti 🎊 ═════════════════ */
+const lienzo = $('lienzo-confetti');
+const ctx = lienzo.getContext('2d');
+let particulas = [], confettiActivo = false;
+const COLORES_CONFETTI = ['#fbbf24', '#f59e0b', '#fde68a', '#34d399', '#10b981', '#f87171', '#ef4444', '#fff7ed'];
+function lanzarConfetti(cantidad = 170) {
+  const dpr = window.devicePixelRatio || 1;
+  lienzo.width = innerWidth * dpr; lienzo.height = innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (let i = 0; i < cantidad; i++) {
+    particulas.push({
+      x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 0.5,
+      vx: (Math.random() - .5) * 2.4, vy: 2 + Math.random() * 3.4,
+      ancho: 6 + Math.random() * 7, alto: 8 + Math.random() * 10,
+      rot: Math.random() * Math.PI * 2, vrot: (Math.random() - .5) * .25,
+      color: COLORES_CONFETTI[i % COLORES_CONFETTI.length],
+      vida: 0, maxVida: 170 + Math.random() * 90,
+      forma: Math.random() < .25 ? 'circulo' : 'papel',
+    });
+  }
+  if (!confettiActivo) { confettiActivo = true; requestAnimationFrame(tickConfetti); }
+}
+function tickConfetti() {
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+  particulas = particulas.filter(p => p.vida < p.maxVida && p.y < innerHeight + 30);
+  for (const p of particulas) {
+    p.vida++; p.x += p.vx + Math.sin((p.vida + p.maxVida) * .05) * .6; p.y += p.vy; p.rot += p.vrot;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - p.vida / p.maxVida);
+    ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.color;
+    if (p.forma === 'circulo') { ctx.beginPath(); ctx.arc(0, 0, p.ancho / 2, 0, Math.PI * 2); ctx.fill(); }
+    else ctx.fillRect(-p.ancho / 2, -p.alto / 2, p.ancho, p.alto);
+    ctx.restore();
+  }
+  if (particulas.length) requestAnimationFrame(tickConfetti);
+  else { confettiActivo = false; ctx.clearRect(0, 0, innerWidth, innerHeight); }
+}
+
+/* ═════════════════ Navegación entre pantallas y modales ═════════════════ */
+function cambiarPantalla(nombre) {
+  [['pantalla-bienvenida', 'bienvenida'], ['pantalla-revelacion', 'revelacion']].forEach(([id, clave]) => {
+    const el = $(id);
+    const activa = clave === nombre;
+    el.classList.toggle('hidden', !activa);
+    if (activa && clave === 'revelacion') el.classList.add('flex');
+    if (!activa) el.classList.remove('flex');
+    if (activa) { el.classList.remove('animate-aparecer'); void el.offsetWidth; el.classList.add('animate-aparecer'); }
+  });
+  window.scrollTo({ top: 0 });
+}
+const abrirModal  = id => $(id).classList.replace('hidden', 'flex');
+const cerrarModal = id => $(id).classList.replace('flex', 'hidden');
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { cerrarModal('modal-admin'); cerrarModal('modal-confirmar'); }
+});
+['modal-admin', 'modal-confirmar'].forEach(id => {
+  $(id).addEventListener('click', e => { if (e.target === $(id)) cerrarModal(id); });
+});
+
+/* ═════════════════ Cajas del PIN (auto-avance, borrar, pegar) ═════════════════ */
+function configurarCajas(contenedor, alCompletar) {
+  const cajas = [...contenedor.querySelectorAll('input')];
+  cajas.forEach((caja, i) => {
+    caja.addEventListener('input', () => {
+      caja.value = caja.value.replace(/\D/g, '').slice(0, 1);
+      if (caja.value && i < cajas.length - 1) cajas[i + 1].focus();
+      contenedor.dispatchEvent(new CustomEvent('pin-cambio'));
+      if (leerPinContenedor(contenedor).length === 4 && i === cajas.length - 1 && alCompletar) alCompletar();
+    });
+    caja.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !caja.value && i > 0) { e.preventDefault(); cajas[i - 1].focus(); cajas[i - 1].value = ''; contenedor.dispatchEvent(new CustomEvent('pin-cambio')); }
+      if (e.key === 'Enter' && alCompletar) alCompletar();
+    });
+    caja.addEventListener('paste', e => {
+      e.preventDefault();
+      const texto = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\D/g, '').slice(0, 4);
+      [...texto].forEach((d, j) => { if (cajas[j]) cajas[j].value = d; });
+      cajas[Math.min(texto.length, cajas.length - 1)].focus();
+      contenedor.dispatchEvent(new CustomEvent('pin-cambio'));
+    });
+  });
+}
+const leerPinContenedor = contenedor => [...contenedor.querySelectorAll('input')].map(i => i.value).join('');
+const leerPin = id => leerPinContenedor($(id));
+const limpiarPines = () => ['cajas-pin-login', 'cajas-pin-nueva', 'cajas-pin-confirmar'].forEach(id => $(id).querySelectorAll('input').forEach(i => i.value = ''));
+const enfocarPrimeraCaja = id => setTimeout(() => $(id).querySelector('input')?.focus(), 60);
+function sacudir(el) {
+  el.classList.remove('animate-sacudir'); void el.offsetWidth; el.classList.add('animate-sacudir');
+  el.addEventListener('animationend', () => el.classList.remove('animate-sacudir'), { once: true });
+}
+function actualizarBotones() {
+  if (modoActual === 'ingresar') $('btn-entrar').disabled = ocupado || leerPin('cajas-pin-login').length !== 4;
+  if (modoActual === 'crear') {
+    const a = leerPin('cajas-pin-nueva'), b = leerPin('cajas-pin-confirmar');
+    $('btn-crear').disabled = ocupado || !(a.length === 4 && b.length === 4);
+  }
+}
+
+/* ═════════════════ Inicio: preparar la lista de nombres y la BD ═════════════════ */
+function llenarSelector() {
+  const selector = $('selector-nombre');
+  FAMILIA.slice().sort((a, b) => a.localeCompare(b, 'es')).forEach(nombre => {
+    const op = document.createElement('option');
+    op.value = nombre; op.textContent = nombre;
+    selector.appendChild(op);
+  });
+}
+function inicializarBD() {
+  if (typeof window.supabase === 'undefined') {
+    $('alerta-config-texto').innerHTML = 'No se pudo cargar Supabase desde el CDN. Revisa tu conexión a internet y recarga la página.';
+    $('alerta-config').classList.remove('hidden');
+    return;
+  }
+  if (!credencialesListas()) { $('alerta-config').classList.remove('hidden'); $('selector-nombre').disabled = true; return; }
+  try { bd = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
+  catch (e) {
+    console.error(e);
+    $('alerta-config-texto').textContent = 'No se pudo conectar con Supabase. Revisa que la URL y la clave sean correctas (sección ① del código).';
+    $('alerta-config').classList.remove('hidden');
+    $('selector-nombre').disabled = true;
+  }
+}
+
+/* ═════════════════ Flujo del login ═════════════════ */
+$('selector-nombre').addEventListener('change', async () => {
+  const nombre = $('selector-nombre').value;
+  pintarAvatar($('avatar-seleccionado'), nombre);
+  limpiarPines();
+  participanteEnVista = null; modoActual = null;
+  ['zona-pin-login', 'zona-pin-nuevo'].forEach(id => $(id).classList.add('hidden'));
+  $('zona-elegir').classList.remove('hidden');
+  $('estado-nombre').textContent = '';
+  actualizarBotones();
+  if (!nombre) return;
+  if (!bd) { $('estado-nombre').textContent = '⚠️ Base de datos sin configurar'; return; }
+  $('estado-nombre').textContent = 'Buscando…';
+  try {
+    const { data, error } = await bd.from('participantes').select('nombre, pin_hash, es_admin').eq('nombre', nombre);
+    if (error) throw error;
+    $('zona-elegir').classList.add('hidden');
+    if (data.length) {
+      participanteEnVista = data[0]; modoActual = 'ingresar';
+      $('zona-pin-login').classList.remove('hidden');
+      $('estado-nombre').textContent = `¡Hola de nuevo, ${nombre}! 👋 Ingresa tu PIN`;
+      enfocarPrimeraCaja('cajas-pin-login');
+    } else {
+      modoActual = 'crear';
+      $('zona-pin-nuevo').classList.remove('hidden');
+      $('estado-nombre').textContent = `¡Hola, ${nombre}! ✨ Primera vez por aquí: crea tu PIN`;
+      enfocarPrimeraCaja('cajas-pin-nueva');
+    }
+  } catch (e) {
+    console.error(e);
+    $('estado-nombre').textContent = '';
+    toast('😿 Error de conexión con la base de datos', 'error');
+  }
+  actualizarBotones();
+});
+
+/* — Iniciar sesión con PIN existente — */
+async function intentarEntrar() {
+  if (modoActual !== 'ingresar' || $('btn-entrar').disabled) return;
+  const pin = leerPin('cajas-pin-login');
+  if (pin.length !== 4 || !participanteEnVista) return;
+  ocupado = true; actualizarBotones();
+  $('btn-entrar').textContent = '🔍 Verificando…';
+  await esperar(40); // deja que el navegador pinte el estado "verificando"
+  try {
+    const [sal, iteraciones, hashGuardado] = participanteEnVista.pin_hash.split('$');
+    const hash = hashearPin(pin, sal, parseInt(iteraciones, 10) || ITERACIONES_PIN);
+    if (hash === hashGuardado) iniciarSesion(participanteEnVista);
+    else {
+      sacudir($('cajas-pin-login')); limpiarPines(); actualizarBotones();
+      enfocarPrimeraCaja('cajas-pin-login');
+      toast('PIN incorrecto 🙈 ¡Inténtalo de nuevo!', 'error');
+    }
+  } finally {
+    ocupado = false; $('btn-entrar').textContent = 'Entrar 💌'; actualizarBotones();
+  }
+}
+$('btn-entrar').addEventListener('click', intentarEntrar);
+
+/* — Primera vez: crear cuenta con PIN nuevo — */
+async function intentarCrear() {
+  if (modoActual !== 'crear' || $('btn-crear').disabled) return;
+  const nombre = $('selector-nombre').value;
+  const pin = leerPin('cajas-pin-nueva'), confirmacion = leerPin('cajas-pin-confirmar');
+  if (pin.length !== 4 || confirmacion.length !== 4) return;
+  if (pin !== confirmacion) {
+    sacudir($('cajas-pin-confirmar'));
+    $('cajas-pin-confirmar').querySelectorAll('input').forEach(i => i.value = '');
+    actualizarBotones(); enfocarPrimeraCaja('cajas-pin-confirmar');
+    toast('Los PIN no coinciden 🙈', 'error');
+    return;
+  }
+  ocupado = true; actualizarBotones();
+  $('btn-crear').textContent = '🔒 Guardando…';
+  await esperar(40);
+  try {
+    const { data: todos, error: errLista } = await bd.from('participantes').select('nombre, es_admin');
+    if (errLista) throw errLista;
+    // Organizador: el nombre definido en NOMBRE_ADMIN, o la primera persona en registrarse
+    const esAdmin = todos.length === 0 || (NOMBRE_ADMIN && NOMBRE_ADMIN === nombre);
+    const sal = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+    const pinHash = [sal, ITERACIONES_PIN, hashearPin(pin, sal)].join('$');
+    const { data, error } = await bd.from('participantes')
+      .insert({ nombre, pin_hash: pinHash, es_admin: esAdmin })
+      .select('nombre, pin_hash, es_admin');
+    if (error) {
+      if (error.code === '23505') { // ese nombre ya fue registrado mientras tanto
+        toast('Ese nombre ya tiene PIN. Vuelve a elegirlo para ingresar.', 'error');
+        $('selector-nombre').dispatchEvent(new Event('change'));
+      } else throw error;
+      return;
+    }
+    toast('¡Listo! Tu PIN quedó guardado 🔐', 'exito');
+    iniciarSesion(data[0]);
+  } catch (e) {
+    console.error(e);
+    toast('No se pudo crear tu cuenta 😿 Revisa la conexión', 'error');
+  } finally {
+    ocupado = false; $('btn-crear').textContent = 'Crear mi llave secreta ✨'; actualizarBotones();
+  }
+}
+$('btn-crear').addEventListener('click', intentarCrear);
+
+/* ═════════════════ Sesión iniciada: pantalla de revelación ═════════════════ */
+function iniciarSesion(fila) {
+  usuarioActual = fila;
+  $('saludo-nombre').textContent = fila.nombre;
+  pintarAvatar($('avatar-usuario'), fila.nombre);
+  $('btn-admin').classList.toggle('hidden', !fila.es_admin);
+  cambiarPantalla('revelacion');
+  cargarMiResultado();
+}
+
+async function cargarMiResultado() {
+  $('estado-cargando').classList.remove('hidden'); $('estado-cargando').classList.add('flex');
+  $('estado-espera').classList.add('hidden');
+  $('estado-listo').classList.add('hidden');
+  try {
+    const { data, error } = await bd.from('sorteo').select('recibe_nombre_cifrado').eq('da_nombre', usuarioActual.nombre);
+    if (error) throw error;
+    $('estado-cargando').classList.add('hidden'); $('estado-cargando').classList.remove('flex');
+    if (!data.length) {
+      $('texto-espera').textContent = `Tranquilo, ${usuarioActual.nombre}… el organizador todavía no generó el sorteo. ¡Vuelve más tarde! 💛`;
+      $('estado-espera').classList.remove('hidden');
+      if (usuarioActual.es_admin) toast('Psst… como organizador puedes generar el sorteo con el botón 🎁');
+      return;
+    }
+    const amigo = descifrar(data[0].recibe_nombre_cifrado);
+    if (!amigo) {
+      $('texto-espera').textContent = 'Tu sobre no se pudo abrir 😢 Avísale al organizador.';
+      $('estado-espera').classList.remove('hidden');
+      return;
+    }
+    prepararTarjeta(amigo);
+    $('estado-listo').classList.remove('hidden');
+  } catch (e) {
+    console.error(e);
+    $('estado-cargando').classList.add('hidden'); $('estado-cargando').classList.remove('flex');
+    $('texto-espera').textContent = 'Error de conexión 😿 Toca "Revisar de nuevo".';
+    $('estado-espera').classList.remove('hidden');
+  }
+}
+$('btn-reintentar').addEventListener('click', cargarMiResultado);
+
+function prepararTarjeta(amigo) {
+  $('nombre-amigo').textContent = amigo;
+  pintarAvatar($('avatar-amigo'), amigo);
+  $('tarjeta-interior').classList.remove('volteada');
+  $('pista-secreto').classList.add('opacity-0');
+}
+function voltearTarjeta() {
+  const interior = $('tarjeta-interior');
+  if (interior.classList.contains('volteada')) return;
+  interior.classList.add('volteada');
+  setTimeout(() => { lanzarConfetti(); $('pista-secreto').classList.remove('opacity-0'); }, 380);
+}
+$('tarjeta-sorteo').addEventListener('click', voltearTarjeta);
+$('tarjeta-sorteo').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); voltearTarjeta(); }
+});
+
+$('btn-salir').addEventListener('click', () => {
+  usuarioActual = null; participanteEnVista = null; modoActual = null;
+  $('selector-nombre').value = '';
+  pintarAvatar($('avatar-seleccionado'), '');
+  limpiarPines();
+  ['zona-pin-login', 'zona-pin-nuevo'].forEach(id => $(id).classList.add('hidden'));
+  $('zona-elegir').classList.remove('hidden');
+  $('estado-nombre').textContent = '';
+  actualizarBotones();
+  cambiarPantalla('bienvenida');
+});
+
+/* ═════════════════ El algoritmo del sorteo 🎲 ═════════════════
+   Baraja todos los nombres y valida, uno por uno, que nadie haya
+   sacado a alguien de su propio grupo (ni a sí mismo). Si la
+   combinación falla, la descarta y vuelve a empezar automáticamente
+   hasta encontrar una 100% válida para TODOS. */
+function barajar(lista) {
+  for (let i = lista.length - 1; i > 0; i--) {
+    const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+    [lista[i], lista[j]] = [lista[j], lista[i]];
+  }
+  return lista;
+}
+function generarSorteo(maxIntentos = 10000) {
+  const personas = [...FAMILIA];
+  for (let intento = 0; intento < maxIntentos; intento++) {
+    const bolsa = barajar([...personas]);
+    let valido = true;
+    for (let i = 0; i < personas.length; i++) {
+      if (bolsa[i] === personas[i] || GRUPO_DE[bolsa[i]] === GRUPO_DE[personas[i]]) { valido = false; break; }
+    }
+    if (valido) {
+      const asignaciones = {};
+      personas.forEach((persona, i) => asignaciones[persona] = bolsa[i]);
+      return asignaciones;
+    }
+  }
+  throw new Error('No se encontró una combinación válida');
+}
+
+/* ═════════════════ Panel del organizador ═════════════════ */
+$('btn-admin').addEventListener('click', async () => {
+  abrirModal('modal-admin');
+  $('stat-registrados').textContent = '…'; $('stat-sorteo').textContent = '…';
+  $('chips-participantes').innerHTML = '';
+  try {
+    const [resParticipantes, resSorteo] = await Promise.all([
+      bd.from('participantes').select('nombre'),
+      bd.from('sorteo').select('da_nombre'),
+    ]);
+    if (resParticipantes.error) throw resParticipantes.error;
+    if (resSorteo.error) throw resSorteo.error;
+    const registrados = new Set(resParticipantes.data.map(f => f.nombre));
+    const hecho = resSorteo.data.length > 0;
+    $('stat-registrados').textContent = `${registrados.size}/${FAMILIA.length}`;
+    $('stat-sorteo').textContent = hecho ? '✅ ¡Hecho!' : '⏳ Pendiente';
+    $('chips-participantes').innerHTML = FAMILIA.slice().sort((a, b) => a.localeCompare(b, 'es')).map(nombre => {
+      const ok = registrados.has(nombre);
+      const clases = ok
+        ? 'bg-amber-300/20 text-amber-200 ring-1 ring-amber-300/50'
+        : 'bg-white/5 text-emerald-100/40 ring-1 ring-white/10';
+      return `<span class="rounded-full px-3 py-1 text-xs font-bold ${clases}">${ok ? '✓ ' : '· '}${nombre}</span>`;
+    }).join('');
+    $('btn-generar-sorteo').classList.toggle('hidden', hecho);
+    $('nota-sorteo').classList.toggle('hidden', !hecho);
+  } catch (e) {
+    console.error(e);
+    toast('No se pudo cargar el panel 😿', 'error');
+  }
+});
+$('btn-cerrar-admin').addEventListener('click', () => cerrarModal('modal-admin'));
+
+$('btn-generar-sorteo').addEventListener('click', () => {
+  cerrarModal('modal-admin');
+  abrirModal('modal-confirmar');
+});
+$('btn-cancelar-sorteo').addEventListener('click', () => cerrarModal('modal-confirmar'));
+
+$('btn-confirmar-sorteo').addEventListener('click', async () => {
+  const btn = $('btn-confirmar-sorteo');
+  btn.disabled = true; btn.textContent = '🎲 Sorteando…';
+  try {
+    await esperar(50);
+    // Doble verificación: el sorteo sólo puede existir UNA vez
+    const { data: previos, error: errPrevios } = await bd.from('sorteo').select('id').limit(1);
+    if (errPrevios) throw errPrevios;
+    if (previos && previos.length) {
+      toast('El sorteo ya estaba hecho 🎉', 'info');
+    } else {
+      const asignaciones = generarSorteo();
+      const filas = FAMILIA.map(da => ({ da_nombre: da, recibe_nombre_cifrado: cifrar(asignaciones[da]) }));
+      const { error } = await bd.from('sorteo').insert(filas); // inserción única y atómica
+      if (error) throw error;
+      lanzarConfetti(230);
+      toast('¡Sorteo generado! 🎉 Cada quien tiene su amigo secreto', 'exito');
+    }
+    cerrarModal('modal-confirmar');
+    cargarMiResultado(); // el organizador también puede abrir su sobre
+  } catch (e) {
+    console.error(e);
+    toast('No se pudo generar el sorteo 😿 Inténtalo de nuevo', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '¡Sí, generar el sorteo! 🎉';
+  }
+});
+
+/* ═════════════════ ¡Que empiece la magia! ═════════════════ */
+llenarSelector();
+configurarCajas($('cajas-pin-login'), intentarEntrar);
+configurarCajas($('cajas-pin-nueva'), null);
+configurarCajas($('cajas-pin-confirmar'), intentarCrear);
+['cajas-pin-login', 'cajas-pin-nueva', 'cajas-pin-confirmar'].forEach(id => $(id).addEventListener('pin-cambio', actualizarBotones));
+inicializarBD();
+console.log('%c🎁 Amigo Secreto de la Familia', 'font-size:16px;font-weight:bold', '— ¡listo!');
+</script>
+</body>
+</html>
