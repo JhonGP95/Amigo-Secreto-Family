@@ -305,7 +305,7 @@
 const SUPABASE_URL      = 'https://rshubvczkdtjmhnmijcb.supabase.co';        // ej: 'https://xxxx.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJzaHVidmN6a2R0am1obm1pamNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzMjU2NjUsImV4cCI6MjEwNDkwMTY2NX0.MOnehlgVMByZZG2IpuR849oM6ZNTDcrKh0WcnKGqoJA';     // ej: 'eyJhbGciOi...'
 const CLAVE_CIFRADO     = 'nochebuena-7e959422b0-275efacfc3-2026';
-const NOMBRE_ADMIN      = null;                                  // ej: 'Jhon'  o  null
+const NOMBRE_ADMIN      = 'Jhon';                                  // el organizador siempre es Jhon ('Jhon'  o  null)
 
 /* ─────────────────────────────────────────────────────────────────
    ⓿ ESTRUCTURA DE LA BASE DE DATOS (cópiala en Supabase → SQL Editor)
@@ -382,8 +382,7 @@ const descifrar = dato => {
   catch { return ''; }
 };
 
-/* ═════════════════ Avilitos de colores (iniciales) ═════════════════ */
-const PALETA_AVATAR = [
+/* ═════════════════ Avilitos de colores (iniciales) ═════════════════ */const PALETA_AVATAR = [
   ['#34d399', '#0f766e'], ['#fbbf24', '#d97706'], ['#fb7185', '#be123c'],
   ['#2dd4bf', '#0d9488'], ['#f97316', '#e11d48'], ['#a3e635', '#059669'], ['#f43f5e', '#9f1239'],
 ];
@@ -410,6 +409,12 @@ function toast(mensaje, tipo = 'info') {
   setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(-10px)'; }, 3400);
   setTimeout(() => el.remove(), 3900);
 }
+
+/* Anexo el detalle técnico del error a los mensajes, para diagnosticar con una captura */
+const detallarError = e => {
+  const detalle = e && (e.code || e.message) ? [e.code, e.message].filter(Boolean).join(' · ') : '';
+  return detalle ? ` (${detalle})` : '';
+};
 
 /* ═════════════════ Confeti 🎊 ═════════════════ */
 const lienzo = $('lienzo-confetti');
@@ -565,7 +570,7 @@ $('selector-nombre').addEventListener('change', async () => {
   } catch (e) {
     console.error(e);
     $('estado-nombre').textContent = '';
-    toast('😿 Error de conexión con la base de datos', 'error');
+    toast(`😿 Error de conexión con la base de datos${detallarError(e)}`, 'error');
   }
   actualizarBotones();
 });
@@ -612,8 +617,9 @@ async function intentarCrear() {
   try {
     const { data: todos, error: errLista } = await bd.from('participantes').select('nombre, es_admin');
     if (errLista) throw errLista;
-    // Organizador: el nombre definido en NOMBRE_ADMIN, o la primera persona en registrarse
-    const esAdmin = todos.length === 0 || (NOMBRE_ADMIN && NOMBRE_ADMIN === nombre);
+    // Organizador: si NOMBRE_ADMIN está definido, sólo esa persona lo es;
+    // si está en null, lo será la primera persona en registrarse
+    const esAdmin = NOMBRE_ADMIN ? NOMBRE_ADMIN === nombre : todos.length === 0;
     const sal = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
     const pinHash = [sal, ITERACIONES_PIN, hashearPin(pin, sal)].join('$');
     const { data, error } = await bd.from('participantes')
@@ -630,7 +636,7 @@ async function intentarCrear() {
     iniciarSesion(data[0]);
   } catch (e) {
     console.error(e);
-    toast('No se pudo crear tu cuenta 😿 Revisa la conexión', 'error');
+    toast(`No se pudo crear tu cuenta 😿 Revisa tu conexión${detallarError(e)}`, 'error');
   } finally {
     ocupado = false; $('btn-crear').textContent = 'Crear mi llave secreta ✨'; actualizarBotones();
   }
@@ -672,7 +678,7 @@ async function cargarMiResultado() {
   } catch (e) {
     console.error(e);
     $('estado-cargando').classList.add('hidden'); $('estado-cargando').classList.remove('flex');
-    $('texto-espera').textContent = 'Error de conexión 😿 Toca "Revisar de nuevo".';
+    $('texto-espera').textContent = `Error de conexión 😿 Toca "Revisar de nuevo"${detallarError(e)}`;
     $('estado-espera').classList.remove('hidden');
   }
 }
@@ -763,7 +769,7 @@ $('btn-admin').addEventListener('click', async () => {
     $('nota-sorteo').classList.toggle('hidden', !hecho);
   } catch (e) {
     console.error(e);
-    toast('No se pudo cargar el panel 😿', 'error');
+    toast(`No se pudo cargar el panel 😿${detallarError(e)}`, 'error');
   }
 });
 $('btn-cerrar-admin').addEventListener('click', () => cerrarModal('modal-admin'));
@@ -796,7 +802,7 @@ $('btn-confirmar-sorteo').addEventListener('click', async () => {
     cargarMiResultado(); // el organizador también puede abrir su sobre
   } catch (e) {
     console.error(e);
-    toast('No se pudo generar el sorteo 😿 Inténtalo de nuevo', 'error');
+    toast(`No se pudo generar el sorteo 😿 Inténtalo de nuevo${detallarError(e)}`, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '¡Sí, generar el sorteo! 🎉';
   }
